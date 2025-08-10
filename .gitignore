@@ -1,0 +1,13 @@
+Python
+pycache/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-selfcheck.json
+
+File sistem operasi
+.DS_Store
+Thumbs.db
