@@ -84,7 +84,7 @@ HTML_TEMPLATE = """
                 <div class="p-4 rounded-lg bg-gray-800/50"><p class="text-sm text-gray-400">Tekanan Udara</p><p id="tekanan" class="text-2xl font-semibold mt-1">-</p></div>
             </div>
              <div class="text-center mt-6 pt-4 border-t border-gray-700">
-                <p class="text-xs text-gray-500">Latensi Server: <span id="latency" class="font-medium">-</span></p>
+                <p class="text-xs text-gray-500">Latensi Server (detik): <span id="latency" class="font-medium">-</span></p>
             </div>
         </div>
         
@@ -112,8 +112,7 @@ HTML_TEMPLATE = """
                 document.getElementById('status-dot').className = 'status-dot bg-green-400';
                 document.getElementById('status-text').textContent = 'Terhubung ke Server';
                 
-                // JavaScript akan menampilkan waktu sesuai format lokal
-                const wibTime = new Date(data.waktu + "Z"); // Tambahkan 'Z' untuk menandakan ini waktu UTC
+                const wibTime = new Date(data.waktu + "Z");
                 document.getElementById('waktu').textContent = wibTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Jakarta' });
 
                 document.getElementById('prediksi').textContent = data.prediksi;
@@ -121,7 +120,7 @@ HTML_TEMPLATE = """
                 document.getElementById('kelembaban').textContent = `${parseFloat(data.kelembaban).toFixed(2)} %`;
                 document.getElementById('angin').textContent = `${parseFloat(data.angin).toFixed(2)} m/s`;
                 document.getElementById('tekanan').textContent = `${parseFloat(data.tekanan).toFixed(2)} kPa`;
-                document.getElementById('latency').textContent = `${data.latency} ms`;
+                document.getElementById('latency').textContent = `${data.latency} s`;
 
                 const iconContainer = document.getElementById('prediksi-container');
                 const existingIcon = iconContainer.querySelector('svg');
@@ -181,11 +180,11 @@ def predict():
         prediction_text = label_encoder.inverse_transform(prediction_encoded)
         
         end_time = time.time()
-        latency_ms = round((end_time - start_time) * 1000)
+        # --- PERUBAHAN DI SINI ---
+        # Mengubah latency ke detik dengan 3 angka di belakang koma
+        latency_s = f"{(end_time - start_time):.3f}"
 
         try:
-            # --- PERBAIKAN DI SINI ---
-            # Menggunakan pytz untuk konversi zona waktu yang akurat
             utc_now = datetime.now(pytz.utc)
             wib_tz = pytz.timezone('Asia/Jakarta')
             wib_now = utc_now.astimezone(wib_tz)
@@ -194,14 +193,15 @@ def predict():
             log_data = [
                 timestamp, iot_data['suhu'], iot_data['kelembaban'],
                 iot_data['kecepatan_angin'], iot_data['tekanan_udara'],
-                prediction_text[0], latency_ms
+                prediction_text[0], latency_s # Menyimpan latency dalam detik
             ]
             
             file_exists = os.path.isfile(LOG_FILE)
             with open(LOG_FILE, 'a', newline='') as f:
                 writer = csv.writer(f)
                 if not file_exists:
-                    header = ['Waktu (WIB)', 'Suhu', 'Kelembaban', 'Kecepatan Angin', 'Tekanan Udara', 'Prediksi', 'Latency (ms)']
+                    # Mengubah header log
+                    header = ['Waktu (WIB)', 'Suhu', 'Kelembaban', 'Kecepatan Angin', 'Tekanan Udara', 'Prediksi', 'Latency (s)']
                     writer.writerow(header)
                 writer.writerow(log_data)
         except Exception as e:
@@ -219,7 +219,6 @@ def latest_data():
         with open(LOG_FILE, 'r') as f:
             last_line = f.readlines()[-1]
             data = last_line.strip().split(',')
-            # Mengirim waktu dalam format ISO 8601 agar JavaScript bisa mem-parsingnya dengan benar
             json_data = {
                 "waktu": data[0].replace(" ", "T"), 
                 "suhu": data[1], "kelembaban": data[2],
