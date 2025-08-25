@@ -6,7 +6,7 @@ from flask import Flask, request, jsonify, send_file, render_template_string
 import joblib
 import numpy as np
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import csv
 import time
 
@@ -66,7 +66,7 @@ HTML_TEMPLATE = """
                     <span id="status-text" class="font-medium text-gray-300">Menunggu data pertama...</span>
                 </div>
                 <div class="text-right">
-                    <p class="text-sm text-gray-400">Update Terakhir</p>
+                    <p class="text-sm text-gray-400">Update Terakhir (WIB)</p>
                     <p id="waktu" class="font-semibold text-lg">-</p>
                 </div>
             </div>
@@ -112,7 +112,7 @@ HTML_TEMPLATE = """
 
                 document.getElementById('status-dot').className = 'status-dot bg-green-400';
                 document.getElementById('status-text').textContent = 'Terhubung ke Server';
-                document.getElementById('waktu').textContent = new Date(data.waktu).toLocaleTimeString('id-ID');
+                document.getElementById('waktu').textContent = new Date(data.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 document.getElementById('prediksi').textContent = data.prediksi;
                 document.getElementById('suhu').textContent = `${parseFloat(data.suhu).toFixed(2)} °C`;
                 document.getElementById('kelembaban').textContent = `${parseFloat(data.kelembaban).toFixed(2)} %`;
@@ -181,7 +181,14 @@ def predict():
         latency_ms = round((end_time - start_time) * 1000)
 
         try:
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # --- PERUBAHAN DI SINI ---
+            # Dapatkan waktu UTC saat ini dari server
+            utc_now = datetime.utcnow()
+            # Konversi ke WIB dengan menambahkan 7 jam
+            wib_now = utc_now + timedelta(hours=7)
+            # Format waktu WIB menjadi string
+            timestamp = wib_now.strftime("%Y-%m-%d %H:%M:%S")
+            
             log_data = [
                 timestamp, iot_data['suhu'], iot_data['kelembaban'],
                 iot_data['kecepatan_angin'], iot_data['tekanan_udara'],
@@ -192,7 +199,7 @@ def predict():
             with open(LOG_FILE, 'a', newline='') as f:
                 writer = csv.writer(f)
                 if not file_exists:
-                    header = ['Waktu', 'Suhu', 'Kelembaban', 'Kecepatan Angin', 'Tekanan Udara', 'Prediksi', 'Latency (ms)']
+                    header = ['Waktu (WIB)', 'Suhu', 'Kelembaban', 'Kecepatan Angin', 'Tekanan Udara', 'Prediksi', 'Latency (ms)']
                     writer.writerow(header)
                 writer.writerow(log_data)
         except Exception as e:
