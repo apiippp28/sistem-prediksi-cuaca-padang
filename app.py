@@ -1,14 +1,14 @@
 # app.py
-# Versi final dengan dashboard real-time dan pencatatan latency.
-# Kode HTML sekarang disematkan langsung di dalam file ini.
+# Versi final dengan konversi zona waktu yang akurat ke WIB.
 
 from flask import Flask, request, jsonify, send_file, render_template_string
 import joblib
 import numpy as np
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import csv
 import time
+import pytz # Library baru untuk menangani zona waktu
 
 # Inisialisasi aplikasi Flask
 app = Flask(__name__)
@@ -19,7 +19,6 @@ ENCODER_PATH = 'label_encoder.pkl'
 LOG_FILE = 'log_prediksi.csv'
 
 # --- Kode HTML untuk Dashboard ---
-# Kode HTML sekarang menjadi variabel string di dalam Python.
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -112,7 +111,11 @@ HTML_TEMPLATE = """
 
                 document.getElementById('status-dot').className = 'status-dot bg-green-400';
                 document.getElementById('status-text').textContent = 'Terhubung ke Server';
-                document.getElementById('waktu').textContent = new Date(data.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                
+                // JavaScript akan menampilkan waktu sesuai format lokal
+                const wibTime = new Date(data.waktu + "Z"); // Tambahkan 'Z' untuk menandakan ini waktu UTC
+                document.getElementById('waktu').textContent = wibTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Jakarta' });
+
                 document.getElementById('prediksi').textContent = data.prediksi;
                 document.getElementById('suhu').textContent = `${parseFloat(data.suhu).toFixed(2)} °C`;
                 document.getElementById('kelembaban').textContent = `${parseFloat(data.kelembaban).toFixed(2)} %`;
@@ -181,12 +184,11 @@ def predict():
         latency_ms = round((end_time - start_time) * 1000)
 
         try:
-            # --- PERUBAHAN DI SINI ---
-            # Dapatkan waktu UTC saat ini dari server
-            utc_now = datetime.utcnow()
-            # Konversi ke WIB dengan menambahkan 7 jam
-            wib_now = utc_now + timedelta(hours=7)
-            # Format waktu WIB menjadi string
+            # --- PERBAIKAN DI SINI ---
+            # Menggunakan pytz untuk konversi zona waktu yang akurat
+            utc_now = datetime.now(pytz.utc)
+            wib_tz = pytz.timezone('Asia/Jakarta')
+            wib_now = utc_now.astimezone(wib_tz)
             timestamp = wib_now.strftime("%Y-%m-%d %H:%M:%S")
             
             log_data = [
@@ -217,8 +219,10 @@ def latest_data():
         with open(LOG_FILE, 'r') as f:
             last_line = f.readlines()[-1]
             data = last_line.strip().split(',')
+            # Mengirim waktu dalam format ISO 8601 agar JavaScript bisa mem-parsingnya dengan benar
             json_data = {
-                "waktu": data[0], "suhu": data[1], "kelembaban": data[2],
+                "waktu": data[0].replace(" ", "T"), 
+                "suhu": data[1], "kelembaban": data[2],
                 "angin": data[3], "tekanan": data[4], "prediksi": data[5], "latency": data[6]
             }
             return jsonify(json_data)
